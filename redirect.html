@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Google OAuth Redirect</title>
+</head>
+<body>
+<script>
+  (function () {
+    // URL fragment looks like: #access_token=...&expires_in=3600&token_type=Bearer&scope=...
+    const hash = window.location.hash.substring(1);
+    const params = new URLSearchParams(hash);
+
+    const accessToken = params.get("access_token");
+    const expiresIn = parseInt(params.get("expires_in") || "3600", 10);
+
+    if (accessToken && window.opener) {
+      window.opener.postMessage({
+        type: "google_oauth_token",
+        access_token: accessToken,
+        expires_in: expiresIn
+      }, "*");
+    }
+
+    // Close the popup after a short delay
+    setTimeout(() => window.close(), 500);
+  })();
+</script>
+</body>
+</html>
