@@ -91,14 +91,23 @@ window.TMLib = (function () {
     
             // 3. Open Popup
             const popup = window.open(authUrl, 'google_auth', 'width=500,height=600');
-    
             const pollTimer = setInterval(() => {
+                // 1. Get the current timestamp
+                const now = Date.now();
+                const startTime = GM_getValue('auth_start_time', 0);
                 try {
-                    if (popup.closed) {
-                        clearInterval(pollTimer);
-                        reject('Window closed by user');
+                    // 2. ONLY check if it's closed if at least 1.2 seconds have passed
+                    // This prevents the "Immediate Close" false positive.
+                    if (now - startTime > 1200) {
+                        if (!popup || popup.closed) {
+                            clearInterval(pollTimer);
+                            console.error("Auth failed: User actually closed the window.");
+                            reject('Window closed by user');
+                            return;
+                        }
                     }
-    
+
+                    // 3. Try to capture the URL
                     // Check if popup URL contains the token (hash fragment)
                     if (popup.location.href.includes('access_token=')) {
                         const params = new URLSearchParams(popup.location.hash.substring(1));
