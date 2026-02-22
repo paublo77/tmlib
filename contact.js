@@ -67,161 +67,98 @@ window.TMLib = (function () {
     
     // ===== CONFIG =====
     const CLIENT_ID = "329205197327-vvbujn7nh03m1b42r8ov4et9nckg8f7k.apps.googleusercontent.com";
-    const REDIRECT_URI = "http://localhost:8080/redirect.html";
+    const REDIRECT_URI = "https://stackexchange.com/oauth/login_success";
     const SCOPES = "https://www.googleapis.com/auth/contacts.readonly";
 
     const TOKEN_KEY = "google_contacts_access_token";
-    const TOKEN_EXP_KEY = "google_contacts_access_token_expires_at";
 
     // ===== TOKEN MANAGEMENT =====
 
-    function getStoredToken() {
-        const token = GM_getValue(TOKEN_KEY, null);
-        const exp = GM_getValue(TOKEN_EXP_KEY, 0);
-        if (!token) return null;
-        if (Date.now() > exp) {
-            // expired
-            return null;
-        }
-        return token;
-    }
-
-    function storeToken(accessToken, expiresInSeconds) {
-        const expiresAt = Date.now() + (expiresInSeconds * 1000) - 30 * 1000; // 30s safety margin
-        GM_setValue(TOKEN_KEY, accessToken);
-        GM_setValue(TOKEN_EXP_KEY, expiresAt);
-    }
-
-    function clearToken() {
-        GM_deleteValue(TOKEN_KEY);
-        GM_deleteValue(TOKEN_EXP_KEY);
-    }
-
-    // ===== OAUTH FLOW =====
-
-    function buildAuthUrl() {
-        const params = new URLSearchParams();
-        params.set("client_id", CLIENT_ID);
-        params.set("redirect_uri", REDIRECT_URI);
-        params.set("response_type", "token");
-        params.set("scope", SCOPES);
-        params.set("include_granted_scopes", "true");
-        params.set("prompt", "consent"); // or "select_account" if you prefer
-
-        return "https://accounts.google.com/o/oauth2/v2/auth?" + params.toString();
-    }
-
-    function startOAuthFlow() {
+    function getAccessToken() {
         return new Promise((resolve, reject) => {
-            const authUrl = buildAuthUrl();
-            const popup = window.open(authUrl, "google_oauth", "width=500,height=600");
-
-            if (!popup) {
-                reject(new Error("Popup blocked"));
-                return;
+            // 1. Check if we already have a valid token in storage
+            const saved = GM_getValue(TOKEN_KEY);
+            if (saved && saved.expiry > Date.now()) {
+                return resolve(saved.token);
             }
-
-            function onMessage(event) {
-                const data = event.data;
-                if (!data || data.type !== "google_oauth_token") return;
-
-                window.removeEventListener("message", onMessage);
-
-                if (data.access_token) {
-                    storeToken(data.access_token, data.expires_in || 3600);
-                    resolve(data.access_token);
-                } else {
-                    reject(new Error("No access token received"));
+    
+            // 2. Build Auth URL
+            const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
+                `client_id=${CLIENT_ID}&` +
+                `redirect_uri=${REDIRECT_URI}&` + // Using a common "success" URL
+                `response_type=token&` +
+                `scope=${encodeURIComponent(SCOPES)}`;
+    
+            // 3. Open Popup
+            const popup = window.open(authUrl, 'google_auth', 'width=500,height=600');
+    
+            const pollTimer = setInterval(() => {
+                try {
+                    if (popup.closed) {
+                        clearInterval(pollTimer);
+                        reject('Window closed by user');
+                    }
+    
+                    // Check if popup URL contains the token (hash fragment)
+                    if (popup.location.href.includes('access_token=')) {
+                        const params = new URLSearchParams(popup.location.hash.substring(1));
+                        const token = params.get('access_token');
+                        const expiresIn = params.get('expires_in');
+    
+                        // Save token with expiry
+                        GM_setValue(TOKEN_KEY, {
+                            token: token,
+                            expiry: Date.now() + (expiresIn * 1000)
+                        });
+    
+                        popup.close();
+                        clearInterval(pollTimer);
+                        resolve(token);
+                    }
+                } catch (e) {
+                    // Cross-origin errors are expected until the redirect happens
                 }
-            }
-
-            window.addEventListener("message", onMessage);
-
-            // Optional timeout
-            setTimeout(() => {
-                window.removeEventListener("message", onMessage);
-                reject(new Error("OAuth timeout"));
-            }, 2 * 60 * 1000);
+            }, 500);
         });
-    }
-
-    async function getAccessToken() {
-        const existing = getStoredToken();
-        if (existing) return existing;
-
-        // No valid token, start OAuth
-        return await startOAuthFlow();
-    }
+    }   
 
     // ===== PEOPLE API: SEARCH BY PHONE =====
 
-    async function findContactByPhone(phoneNumber, accessToken) {
-        const url = "https://people.googleapis.com/v1/people:searchContacts"
-            + "?query=" + encodeURIComponent(phoneNumber)
-            + "&readMask=names,phoneNumbers";
-
-        const res = await fetch(url, {
-            headers: {
-                "Authorization": "Bearer " + accessToken
-            }
-        });
-
-        if (res.status === 401) {
-            // token invalid/expired
-            clearToken();
-            throw new Error("Unauthorized, token invalid");
-        }
-
-        if (!res.ok) {
-            const text = await res.text();
-            throw new Error("People API error: " + res.status + " " + text);
-        }
-
-        const data = await res.json();
-        return data.results || [];
-    }
-
-    // ===== SIMPLE CACHE (PER SESSION) =====
-
-    const phoneCache = new Map(); // phone -> result array
-
-    async function lookupPhone(phoneNumber) {
-        if (!phoneNumber) return [];
-
-        const normalized = phoneNumber.replace(/\s+/g, "");
-        if (phoneCache.has(normalized)) {
-            return phoneCache.get(normalized);
-        }
-
-        const token = await getAccessToken();
-        const results = await findContactByPhone(normalized, token);
-        phoneCache.set(normalized, results);
-        return results;
-    }
-
-    // ===== EXAMPLE USAGE HOOK =====
-    // Here you decide WHEN and HOW to call lookupPhone(phoneNumber)
-    // For demo, we just expose it on window and log a test number.
-
-    async function demo() {
-        // Replace with the phone number you want to test
-        const testNumber = "+393331234567";
-
+    async function findContactByPhone(phoneNumber) {
         try {
-            const results = await lookupPhone(testNumber);
-            if (results.length > 0) {
-                console.log("[Contacts] Match found for", testNumber, results);
-            } else {
-                console.log("[Contacts] No match for", testNumber);
+            const token = await getAccessToken();
+            const headers = { 'Authorization': `Bearer ${token}` };
+    
+            // STEP 1: Warmup (required by People API for search functionality)
+            await fetch('https://people.googleapis.com/v1/people:searchContacts?query=&readMask=names,phoneNumbers', { headers });
+    
+            // Optional: wait 500ms for cache to stabilize
+            await new Promise(r => setTimeout(r, 500));
+    
+            // STEP 2: Actual Search
+            // Format: query should be the phone number. 
+            // Note: Google recommends removing the '+' for more reliable matches.
+            const cleanPhone = phoneNumber.replace(/\+/g, '');
+            const searchUrl = `https://people.googleapis.com/v1/people:searchContacts?query=${encodeURIComponent(cleanPhone)}&readMask=names,phoneNumbers`;
+    
+            const response = await fetch(searchUrl, { headers });
+            const data = await response.json();
+    
+            if (data.results && data.results.length > 0) {
+                return data.results.map(r => ({
+                    name: r.person.names?.[0]?.displayName || 'Unknown',
+                    phones: r.person.phoneNumbers?.map(p => p.value) || []
+                }));
             }
-        } catch (e) {
-            console.error("[Contacts] Error during lookup:", e);
+            return [];
+        } catch (err) {
+            console.error('Contact lookup failed:', err);
         }
     }
 
     // Expose helper so you can call it from the console or other parts of the script
     return {
         checkNoBB,
-        lookupPhone
+        findContactByPhone
     };
 })();
