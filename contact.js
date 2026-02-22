@@ -135,38 +135,56 @@ window.TMLib = (function () {
     }
     
     // ===== PEOPLE API: SEARCH BY PHONE =====
-
+    
     async function findContactByPhone(phoneNumber) {
         try {
             const token = await getAccessToken();
             const headers = { 'Authorization': `Bearer ${token}` };
     
-            // STEP 1: Warmup (required by People API for search functionality)
+            // 1. Prepare digits for matching
+            const inputDigits = phoneNumber.replace(/\D/g, ''); // e.g., "1234567890"
+            if (inputDigits.length < 4) return [];
+            
+            // Use last 4 digits for the search query (most reliable for Google's index)
+            const lastFour = inputDigits.slice(-4);
+    
+            // STEP 1: Warmup (Essential for the search index)
             await fetch('https://people.googleapis.com/v1/people:searchContacts?query=&readMask=names,phoneNumbers', { headers });
     
-            // Optional: wait 500ms for cache to stabilize
-            await new Promise(r => setTimeout(r, 500));
+            // Optional: slight delay for stabilization
+            await new Promise(r => setTimeout(r, 300));
     
-            // STEP 2: Actual Search
-            // Format: query should be the phone number. 
-            // Note: Google recommends removing the '+' for more reliable matches.
-            const cleanPhone = phoneNumber.replace(/\+/g, '');
-            const searchUrl = `https://people.googleapis.com/v1/people:searchContacts?query=${encodeURIComponent(cleanPhone)}&readMask=names,phoneNumbers`;
+            // STEP 2: Search using the suffix
+            const searchUrl = `https://people.googleapis.com/v1/people:searchContacts?query=${lastFour}&readMask=names,phoneNumbers`;
     
             const response = await fetch(searchUrl, { headers });
             const data = await response.json();
     
             if (data && data.results && data.results.length > 0) {
-                return data.results.map(r => ({
-                    name: r.person.names?.[0]?.displayName || 'Unknown',
-                    phones: r.person.phoneNumbers?.map(p => p.value) || []
-                }));
-            } else {
-                console.log("No matching contacts found.");
+                // STEP 3: Filter results manually
+                // Google finds anyone with "7890", we only want the person matching the full number
+                const filtered = data.results
+                    .filter(r => {
+                        return r.person.phoneNumbers?.some(p => {
+                            const foundDigits = p.value.replace(/\D/g, '');
+                            // Check if one contains the other to handle varying country code inclusion
+                            return foundDigits.endsWith(inputDigits) || inputDigits.endsWith(foundDigits);
+                        });
+                    })
+                    .map(r => ({
+                        name: r.person.names?.[0]?.displayName || 'Unknown',
+                        phones: r.person.phoneNumbers?.map(p => p.value) || []
+                    }));
+    
+                if (filtered.length > 0) return filtered;
             }
+    
+            console.log("No matching contacts found for:", phoneNumber);
             return [];
+    
         } catch (err) {
             console.error('Contact lookup failed:', err);
+            return [];
         }
     }
 
