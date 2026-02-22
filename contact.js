@@ -12,6 +12,70 @@
 (function () {
     "use strict";
 
+    function showNoBB(row) {
+       // Prevent duplicate overlay
+       if (document.getElementById('tm-no-bb-overlay')) return;
+
+       // Create overlay div
+       const div = document.createElement('div');
+       div.id = 'tm-no-bb-overlay';
+       div.style.cssText = `
+           position: fixed;
+           top: 0;
+           left: 0;
+           width: 100%;
+           background: red;
+           color: white;
+           padding: 15px;
+           z-index: 999999;
+           display: flex;
+           justify-content: space-between;
+           align-items: center;
+           font-family: sans-serif;
+           box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+       `;
+
+       // Add the text
+       const text = document.createElement('span');
+       text.textContent = 'NO_BB match: ' + row[1];
+       text.style.fontWeight = 'bold';
+       text.style.fontSize = '18px';
+       div.appendChild(text);
+
+       // Add close button
+       const closeBtn = document.createElement('button');
+       closeBtn.textContent = '✕'; // X symbol
+       closeBtn.style.cssText = `
+           background: white;
+           color: red;
+           border: none;
+           padding: 5px 10px;
+           font-size: 16px;
+           cursor: pointer;
+       `;
+       closeBtn.onclick = () => div.remove();
+       div.appendChild(closeBtn);
+
+       // Append to body
+       document.body.appendChild(div);
+   }
+
+    function checkNoBB(APIKEY, SHEET_ID, phone) {
+        const RANGE = "NO_BB!A2:D500";
+        GM_xmlhttpRequest({
+            method: "GET",
+            url: `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${RANGE}?key=${APIKEY}`,
+            onload: function(response) {
+                const data = JSON.parse(response.responseText);
+                for (const row of data.values) {
+                    if (row[0] === phone) {
+                        showNoBB(row);
+                    }
+                }
+            }
+        });
+    }
+    
     // ===== CONFIG =====
     const CLIENT_ID = "329205197327-vvbujn7nh03m1b42r8ov4et9nckg8f7k.apps.googleusercontent.com";
     const REDIRECT_URI = "https://paublo77.github.io/tmlib/redirect.html";
@@ -168,5 +232,5 @@
 
     // Expose helper so you can call it from the console or other parts of the script
     window.googleContactsLookupPhone = lookupPhone;
-
+    window.checkNoBB = checkNoBB
 })();
