@@ -67,7 +67,7 @@ window.TMLib = (function () {
     
     // ===== CONFIG =====
     const CLIENT_ID = "329205197327-vvbujn7nh03m1b42r8ov4et9nckg8f7k.apps.googleusercontent.com";
-    const REDIRECT_URI = "https://stackexchange.com/oauth/login_success";
+    const REDIRECT_URI = window.location.origin + "/oauth/tm-lib-capture";
     const SCOPES = "https://www.googleapis.com/auth/contacts.readonly";
 
     const TOKEN_KEY = "google_contacts_access_token";
