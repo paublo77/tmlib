@@ -1,15 +1,4 @@
-/ ==UserScript==
-// @name         Google Contacts Phone Lookup
-// @namespace    http://tampermonkey.net/
-// @version      0.1
-// @description  Check if a phone number exists in your Google Contacts using People API
-// @match        *://*/*
-// @grant        GM_getValue
-// @grant        GM_setValue
-// @grant        GM_deleteValue
-// ==/UserScript==
-
-(function () {
+window.TMLib = (function () {
     "use strict";
 
     function showNoBB(row) {
@@ -231,6 +220,8 @@
     }
 
     // Expose helper so you can call it from the console or other parts of the script
-    window.googleContactsLookupPhone = lookupPhone;
-    window.checkNoBB = checkNoBB
+    return {
+        checkNoBB,
+        lookupPhone
+    };
 })();
