@@ -108,6 +108,32 @@ window.TMLib = (function () {
         });
     }    
 
+    function popupCallbackDetected() {
+        // ==========================================
+        // ROLE 1: THE CAPTURED POPUP
+        // ==========================================
+        if (window.location.hash.includes('access_token=')) {
+            const params = new URLSearchParams(window.location.hash.substring(1));
+            const token = params.get('access_token');
+            
+            if (token) {
+                const data = { token, expiry: Date.now() + (params.get('expires_in') * 1000) };
+                
+                // Write to the "dead-drop" storage
+                await GM.setValue(TOKEN_KEY, data);
+                
+                // Try to shout to the parent
+                if (window.opener) {
+                    window.opener.postMessage({ type: 'GOOGLE_AUTH_SUCCESS', token }, "*");
+                }
+                
+                window.close();
+                return true; // Stop execution here for the popup
+            }
+        }
+        return false;
+    }
+    
     // ===== PEOPLE API: SEARCH BY PHONE =====
 
     async function findContactByPhone(phoneNumber) {
@@ -147,6 +173,7 @@ window.TMLib = (function () {
     // Expose helper so you can call it from the console or other parts of the script
     return {
         checkNoBB,
+        popupCallbackDetected,
         findContactByPhone
     };
 })();
