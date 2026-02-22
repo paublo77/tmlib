@@ -76,62 +76,64 @@ window.TMLib = (function () {
 
     function getAccessToken() {
         return new Promise((resolve, reject) => {
-            // 1. Check if we already have a valid token in storage
+            // 1. Check for existing token
             const saved = GM_getValue(TOKEN_KEY);
             if (saved && saved.expiry > Date.now()) {
                 return resolve(saved.token);
             }
     
-            // 2. Build Auth URL
+            // 2. Setup
             const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
                 `client_id=${CLIENT_ID}&` +
-                `redirect_uri=${REDIRECT_URI}&` + // Using a common "success" URL
+                `redirect_uri=${encodeURIComponent(REDIRECT_URI)}&` +
                 `response_type=token&` +
                 `scope=${encodeURIComponent(SCOPES)}`;
     
             // 3. Open Popup
-            // Set the start time right before opening the popup
-            GM_setValue('auth_start_time', Date.now());
-            const popup = window.open(authUrl, 'google_auth', 'width=500,height=600');
-            const pollTimer = setInterval(() => {
-                // 1. Get the current timestamp
-                const now = Date.now();
-                const startTime = GM_getValue('auth_start_time', 0);
-                try {
-                    // 2. ONLY check if it's closed if at least 1.2 seconds have passed
-                    // This prevents the "Immediate Close" false positive.
-                    if (now - startTime > 1200) {
-                        if (!popup || popup.closed) {
-                            clearInterval(pollTimer);
-                            console.error("Auth failed: User actually closed the window.");
-                            reject('Window closed by user');
-                            return;
-                        }
-                    }
+            let popup;
+            // The script waits here until the window object is created
+            popup = window.open(authUrl, 'google_auth', 'width=500,height=600');
 
-                    // 3. Try to capture the URL
-                    // Check if popup URL contains the token (hash fragment)
-                    if (popup.location.href.includes('access_token=')) {
-                        const params = new URLSearchParams(popup.location.hash.substring(1));
+            const startTime = Date.now(); // Defined here to track this specific attempt
+            const pollTimer = setInterval(() => {
+                // A. Check if user closed the window (Wait 3 seconds before trusting this)
+                if (Date.now() - startTime > 3000) {
+                    if (!popup || popup.closed) {
+                        clearInterval(pollTimer);
+                        reject('Auth failed: Window closed by user.');
+                        return;
+                    }
+                }
+    
+                // B. Try to capture the token
+                try {
+                    // This line throws an error until the redirect reaches the SAME domain
+                    const currentUrl = popup.location.href;
+    
+                    if (currentUrl.includes('access_token=')) {
+                        const hash = popup.location.hash.substring(1);
+                        const params = new URLSearchParams(hash);
                         const token = params.get('access_token');
                         const expiresIn = params.get('expires_in');
     
-                        // Save token with expiry
-                        GM_setValue(TOKEN_KEY, {
-                            token: token,
-                            expiry: Date.now() + (expiresIn * 1000)
-                        });
+                        if (token) {
+                            GM_setValue(TOKEN_KEY, {
+                                token: token,
+                                expiry: Date.now() + (parseInt(expiresIn) * 1000)
+                            });
     
-                        popup.close();
-                        clearInterval(pollTimer);
-                        resolve(token);
+                            clearInterval(pollTimer);
+                            popup.close();
+                            resolve(token);
+                        }
                     }
                 } catch (e) {
-                    // Cross-origin errors are expected until the redirect happens
+                    // Expected cross-origin error while on Google domains
+                    // The loop continues silently
                 }
             }, 500);
         });
-    }   
+    }
 
     // ===== PEOPLE API: SEARCH BY PHONE =====
 
