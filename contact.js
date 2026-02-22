@@ -64,6 +64,97 @@ window.TMLib = (function () {
             }
         });
     }
+
+    // A global or top-level variable to store the names of your labels
+    let labelCache = {};    
+    async function showContactMatch(results) {
+        if (document.getElementById('tm-contactlist-overlay')) return;
+    
+        const div = document.createElement('div');
+        div.id = 'tm-contactlist-overlay';
+        div.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            background: #000080; /* navyblue isn't a standard CSS hex, using hex */
+            color: white;
+            padding: 15px;
+            z-index: 999999;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-family: sans-serif;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+        `;
+    
+        // Container for the contact info
+        const infoContainer = document.createElement('div');
+        infoContainer.style.display = 'flex';
+        infoContainer.style.alignItems = 'center';
+        infoContainer.style.gap = '15px';
+    
+        const title = document.createElement('span');
+        title.textContent = 'Contact match: ';
+        title.style.fontWeight = 'bold';
+        title.style.fontSize = '18px';
+        infoContainer.appendChild(title);
+    
+        // Loop through each result (usually just 1, but handles multiples)
+        results.forEach(contact => {
+            const contactSpan = document.createElement('span');
+            contactSpan.style.fontSize = '18px';
+            
+            // Add the Name
+            contactSpan.textContent = contact.name;
+    
+            // Add Labels as Pills
+            if (contact.labels && contact.labels.length > 0) {
+                contact.labels.forEach(labelId => {
+                    // Get the human-readable name from our cache, or use ID if not found
+                    const labelName = labelCache[labelId] || labelId.replace('contactGroups/', '');
+                    
+                    // Skip the "System" labels if you want it cleaner
+                    if (labelName === 'myContacts' || labelName === 'all') return;
+    
+                    const pill = document.createElement('span');
+                    pill.textContent = labelName;
+                    pill.style.cssText = `
+                        background: #ffcc00;
+                        color: black;
+                        padding: 2px 8px;
+                        border-radius: 12px;
+                        font-size: 12px;
+                        margin-left: 8px;
+                        font-weight: bold;
+                        vertical-align: middle;
+                        text-transform: uppercase;
+                    `;
+                    contactSpan.appendChild(pill);
+                });
+            }
+            infoContainer.appendChild(contactSpan);
+        });
+    
+        div.appendChild(infoContainer);
+    
+        const closeBtn = document.createElement('button');
+        closeBtn.textContent = '✕';
+        closeBtn.style.cssText = `
+            background: white;
+            color: red;
+            border: none;
+            padding: 5px 10px;
+            font-size: 16px;
+            cursor: pointer;
+            border-radius: 4px;
+            margin-left: 20px;
+        `;
+        closeBtn.onclick = () => div.remove();
+        div.appendChild(closeBtn);
+    
+        document.body.appendChild(div);
+    }   
     
     // ===== CONFIG =====
     const CLIENT_ID = "329205197327-vvbujn7nh03m1b42r8ov4et9nckg8f7k.apps.googleusercontent.com";
@@ -155,7 +246,7 @@ window.TMLib = (function () {
             await new Promise(r => setTimeout(r, 300));
     
             // STEP 2: Search using the suffix
-            const searchUrl = `https://people.googleapis.com/v1/people:searchContacts?query=${lastFour}&readMask=names,phoneNumbers`;
+            const searchUrl = `https://people.googleapis.com/v1/people:searchContacts?query=${lastFour}&readMask=names,phoneNumbers,memberships`;
     
             const response = await fetch(searchUrl, { headers });
             const data = await response.json();
@@ -171,10 +262,19 @@ window.TMLib = (function () {
                             return foundDigits.endsWith(inputDigits) || inputDigits.endsWith(foundDigits);
                         });
                     })
-                    .map(r => ({
-                        name: r.person.names?.[0]?.displayName || 'Unknown',
-                        phones: r.person.phoneNumbers?.map(p => p.value) || []
-                    }));
+                    .map(r => {
+                        // 3. Extract Label Names
+                        // Google returns group IDs (resourceNames). We filter for contactGroupIds.
+                        const labels = r.person.memberships
+                            ?.filter(m => m.contactGroupMembership)
+                            .map(m => m.contactGroupMembership.contactGroupId) || [];
+    
+                        return {
+                            name: r.person.names?.[0]?.displayName || 'Unknown',
+                            phones: r.person.phoneNumbers?.map(p => p.value) || [],
+                            labels: labels // These are the IDs like "myContacts" or "1234abcd"
+                        };
+                    });
     
                 if (filtered.length > 0) return filtered;
             }
