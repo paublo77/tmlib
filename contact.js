@@ -291,6 +291,7 @@ window.TMLib = (function () {
     // Expose helper so you can call it from the console or other parts of the script
     return {
         checkNoBB,
+        showContactMatch,
         popupCallbackDetected,
         findContactByPhone
     };
