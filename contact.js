@@ -294,7 +294,7 @@ window.TMLib = (function () {
             await new Promise(r => setTimeout(r, 300));
     
             // STEP 2: Search using the suffix
-            const searchUrl = `https://people.googleapis.com/v1/people:searchContacts?query=${lastFour}&readMask=names,phoneNumbers,memberships,resourceName`;
+            const searchUrl = `https://people.googleapis.com/v1/people:searchContacts?query=${lastFour}&readMask=names,phoneNumbers,memberships`;
     
             const response = await fetch(searchUrl, { headers });
             const data = await response.json();
