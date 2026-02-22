@@ -120,7 +120,7 @@ window.TMLib = (function () {
                 const data = { token, expiry: Date.now() + (params.get('expires_in') * 1000) };
                 
                 // Write to the "dead-drop" storage
-                await GM.setValue(TOKEN_KEY, data);
+                GM.setValue(TOKEN_KEY, data);
                 
                 // Try to shout to the parent
                 if (window.opener) {
