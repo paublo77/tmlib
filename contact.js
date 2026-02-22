@@ -90,6 +90,8 @@ window.TMLib = (function () {
                 `scope=${encodeURIComponent(SCOPES)}`;
     
             // 3. Open Popup
+            // Set the start time right before opening the popup
+            GM_setValue('auth_start_time', Date.now());
             const popup = window.open(authUrl, 'google_auth', 'width=500,height=600');
             const pollTimer = setInterval(() => {
                 // 1. Get the current timestamp
