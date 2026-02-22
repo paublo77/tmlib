@@ -1,6 +1,36 @@
 window.TMLib = (function () {
     "use strict";
 
+    const labelMap = {
+      "557eb78eb6e15d": "figa",
+      "901612a895ff67c": "tits",
+      "121278c08a36a491": "_QUICK_US",
+      "1c827a1b8aca5d81": "vax",
+      "23df42a20beb5f34": "X",
+      "2fb722ee0d6573db": "ux-",
+      "304581e50b97a5c3": "ita",
+      "311938510bddee91": "elite",
+      "3457554f0e5b1684": "AO-conf",
+      "385036f20cea0bf4": "nuru",
+      "39231a2f89d9dda8": "kgirl",
+      "3d2287b10adfacdc": "shortlist-mi",
+      "404152a18ad642f2": "_ITA",
+      "42160fae0ad5b78e": "_VE_short",
+      "45b4837a8e6ccf1f": "outcall",
+      "4951b2870d8a10de": "_INDI",
+      "673710350a32017c": "porno",
+      "6d81bc780fe4a76e": "flyMeToYou",
+      "7322aef08eba2931": "ux+",
+      "starred": "Starred",
+      "friends": "Friends",
+      "family": "Family",
+      "coworkers": "Coworkers",
+      "myContacts": "My Contacts",
+      "chatBuddies": "Chat contacts",
+      "all": "All Contacts",
+      "blocked": "Blocked"
+    };
+    
     function showNoBB(row) {
        // Prevent duplicate overlay
        if (document.getElementById('tm-no-bb-overlay')) return;
@@ -65,11 +95,11 @@ window.TMLib = (function () {
         });
     }
 
-    // A global or top-level variable to store the names of your labels
-    let labelCache = {};    
     async function showContactMatch(results) {
+        // 1. Prevent duplicate overlay
         if (document.getElementById('tm-contactlist-overlay')) return;
     
+        // 2. Create the main bar
         const div = document.createElement('div');
         div.id = 'tm-contactlist-overlay';
         div.style.cssText = `
@@ -77,84 +107,96 @@ window.TMLib = (function () {
             top: 0;
             left: 0;
             width: 100%;
-            background: #000080; /* navyblue isn't a standard CSS hex, using hex */
+            background: #000080; /* Navy Blue */
             color: white;
-            padding: 15px;
+            padding: 12px 20px;
             z-index: 999999;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            font-family: sans-serif;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
         `;
     
-        // Container for the contact info
-        const infoContainer = document.createElement('div');
-        infoContainer.style.display = 'flex';
-        infoContainer.style.alignItems = 'center';
-        infoContainer.style.gap = '15px';
+        // 3. Left Side: Title and Results
+        const leftSection = document.createElement('div');
+        leftSection.style.display = 'flex';
+        leftSection.style.alignItems = 'center';
+        leftSection.style.gap = '15px';
     
         const title = document.createElement('span');
         title.textContent = 'Contact match: ';
         title.style.fontWeight = 'bold';
-        title.style.fontSize = '18px';
-        infoContainer.appendChild(title);
+        title.style.fontSize = '16px';
+        title.style.opacity = '0.9';
+        leftSection.appendChild(title);
     
-        // Loop through each result (usually just 1, but handles multiples)
+        // 4. Loop through matched contacts
         results.forEach(contact => {
-            const contactSpan = document.createElement('span');
-            contactSpan.style.fontSize = '18px';
-            
-            // Add the Name
-            contactSpan.textContent = contact.name;
+            const contactWrapper = document.createElement('div');
+            contactWrapper.style.display = 'flex';
+            contactWrapper.style.alignItems = 'center';
     
-            // Add Labels as Pills
+            // Contact Name
+            const nameText = document.createElement('span');
+            nameText.textContent = contact.name;
+            nameText.style.fontSize = '18px';
+            nameText.style.fontWeight = '600';
+            contactWrapper.appendChild(nameText);
+    
+            // Render Labels (Memberships)
             if (contact.labels && contact.labels.length > 0) {
                 contact.labels.forEach(labelId => {
-                    // Get the human-readable name from our cache, or use ID if not found
-                    const labelName = labelCache[labelId] || labelId.replace('contactGroups/', '');
-                    
-                    // Skip the "System" labels if you want it cleaner
-                    if (labelName === 'myContacts' || labelName === 'all') return;
+                    // Translate the Hex ID using our map, or fallback to the ID
+                    const humanName = labelMap[labelId] || labelId;
+    
+                    // Filter out boring system labels like 'My Contacts'
+                    if (humanName === 'myContacts' || humanName === 'all') return;
     
                     const pill = document.createElement('span');
-                    pill.textContent = labelName;
+                    pill.textContent = humanName;
                     pill.style.cssText = `
-                        background: #ffcc00;
-                        color: black;
-                        padding: 2px 8px;
-                        border-radius: 12px;
-                        font-size: 12px;
-                        margin-left: 8px;
-                        font-weight: bold;
-                        vertical-align: middle;
+                        background: #ffcc00; /* Gold/Yellow */
+                        color: #000;
+                        padding: 2px 10px;
+                        border-radius: 20px;
+                        font-size: 11px;
+                        margin-left: 10px;
+                        font-weight: 800;
                         text-transform: uppercase;
+                        letter-spacing: 0.5px;
+                        display: inline-block;
                     `;
-                    contactSpan.appendChild(pill);
+                    contactWrapper.appendChild(pill);
                 });
             }
-            infoContainer.appendChild(contactSpan);
+            leftSection.appendChild(contactWrapper);
         });
     
-        div.appendChild(infoContainer);
+        div.appendChild(leftSection);
     
+        // 5. Right Side: Close Button
         const closeBtn = document.createElement('button');
         closeBtn.textContent = '✕';
         closeBtn.style.cssText = `
-            background: white;
-            color: red;
-            border: none;
-            padding: 5px 10px;
-            font-size: 16px;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.3);
+            padding: 4px 12px;
+            font-size: 14px;
             cursor: pointer;
             border-radius: 4px;
-            margin-left: 20px;
+            transition: background 0.2s;
         `;
+        closeBtn.onmouseover = () => closeBtn.style.background = 'rgba(255, 0, 0, 0.6)';
+        closeBtn.onmouseout = () => closeBtn.style.background = 'rgba(255,255,255,0.2)';
         closeBtn.onclick = () => div.remove();
+        
         div.appendChild(closeBtn);
     
+        // 6. Injection
         document.body.appendChild(div);
-    }   
+    }    
     
     // ===== CONFIG =====
     const CLIENT_ID = "329205197327-vvbujn7nh03m1b42r8ov4et9nckg8f7k.apps.googleusercontent.com";
