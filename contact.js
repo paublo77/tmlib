@@ -74,66 +74,39 @@ window.TMLib = (function () {
 
     // ===== TOKEN MANAGEMENT =====
 
-    function getAccessToken() {
+    async function getAccessToken() {
+        // 1. Return cached token if still valid
+        const saved = await GM.getValue(TOKEN_KEY);
+        if (saved && saved.expiry > Date.now()) {
+            return saved.token;
+        }
+    
         return new Promise((resolve, reject) => {
-            // 1. Check for existing token
-            const saved = GM_getValue(TOKEN_KEY);
-            if (saved && saved.expiry > Date.now()) {
-                return resolve(saved.token);
-            }
+            const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=token&scope=${encodeURIComponent(SCOPES)}`;
     
-            // 2. Setup
-            const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
-                `client_id=${CLIENT_ID}&` +
-                `redirect_uri=${encodeURIComponent(REDIRECT_URI)}&` +
-                `response_type=token&` +
-                `scope=${encodeURIComponent(SCOPES)}`;
-    
-            // 3. Open Popup
-            let popup;
-            // The script waits here until the window object is created
-            popup = window.open(authUrl, 'google_auth', 'width=500,height=600');
-
-            const startTime = Date.now(); // Defined here to track this specific attempt
-            const pollTimer = setInterval(() => {
-                // A. Check if user closed the window (Wait 3 seconds before trusting this)
-                if (Date.now() - startTime > 3000) {
-                    if (!popup || popup.closed) {
-                        clearInterval(pollTimer);
-                        reject('Auth failed: Window closed by user.');
-                        return;
-                    }
+            // 2. Setup Listener for the "Shout Back"
+            const handleMessage = (event) => {
+                if (event.data && event.data.type === 'GOOGLE_AUTH_SUCCESS') {
+                    window.removeEventListener('message', handleMessage);
+                    resolve(event.data.token);
                 }
+            };
+            window.addEventListener('message', handleMessage);
     
-                // B. Try to capture the token
-                try {
-                    // This line throws an error until the redirect reaches the SAME domain
-                    const currentUrl = popup.location.href;
-    
-                    if (currentUrl.includes('access_token=')) {
-                        const hash = popup.location.hash.substring(1);
-                        const params = new URLSearchParams(hash);
-                        const token = params.get('access_token');
-                        const expiresIn = params.get('expires_in');
-    
-                        if (token) {
-                            GM_setValue(TOKEN_KEY, {
-                                token: token,
-                                expiry: Date.now() + (parseInt(expiresIn) * 1000)
-                            });
-    
-                            clearInterval(pollTimer);
-                            popup.close();
-                            resolve(token);
-                        }
-                    }
-                } catch (e) {
-                    // Expected cross-origin error while on Google domains
-                    // The loop continues silently
+            // 3. Fallback: Monitor GM Storage (In case window.opener is severed by COOP)
+            const storageTimer = setInterval(async () => {
+                const tokenData = await GM.getValue(TOKEN_KEY);
+                if (tokenData && tokenData.expiry > Date.now()) {
+                    clearInterval(storageTimer);
+                    window.removeEventListener('message', handleMessage);
+                    resolve(tokenData.token);
                 }
-            }, 500);
+            }, 1000);
+    
+            // 4. Open the window (We don't care about the return value anymore)
+            window.open(authUrl, '_blank', 'width=500,height=600');
         });
-    }
+    }    
 
     // ===== PEOPLE API: SEARCH BY PHONE =====
 
