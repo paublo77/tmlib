@@ -137,26 +137,38 @@ window.TMLib = (function () {
             contactWrapper.style.display = 'flex';
             contactWrapper.style.alignItems = 'center';
     
-            // Contact Name
-            const nameText = document.createElement('span');
-            nameText.textContent = contact.name;
-            nameText.style.fontSize = '18px';
-            nameText.style.fontWeight = '600';
-            contactWrapper.appendChild(nameText);
+            // --- THE HYPERLINK ---
+            // Using 'contactId' from your existing map
+            const nameLink = document.createElement('a');
+            nameLink.href = `https://contacts.google.com/person/${contact.contactId}`;
+            nameLink.target = '_blank';
+            nameLink.textContent = contact.name; // This is the displayName
+            
+            nameLink.style.cssText = `
+                color: #00e6ff; /* Cyan for contrast */
+                text-decoration: underline;
+                font-size: 18px;
+                font-weight: 600;
+                cursor: pointer;
+                transition: color 0.2s;
+            `;
     
-            // Render Labels (Memberships)
+            // Hover effect for the link
+            nameLink.onmouseover = () => nameLink.style.color = '#ffffff';
+            nameLink.onmouseout = () => nameLink.style.color = '#00e6ff';
+    
+            contactWrapper.appendChild(nameLink);
+    
+            // --- LABELS PILLS ---
             if (contact.labels && contact.labels.length > 0) {
                 contact.labels.forEach(labelId => {
-                    // Translate the Hex ID using our map, or fallback to the ID
                     const humanName = labelMap[labelId] || labelId;
-    
-                    // Filter out boring system labels like 'My Contacts'
                     if (humanName === 'myContacts' || humanName === 'all') return;
     
                     const pill = document.createElement('span');
                     pill.textContent = humanName;
                     pill.style.cssText = `
-                        background: #ffcc00; /* Gold/Yellow */
+                        background: #ffcc00;
                         color: #000;
                         padding: 2px 10px;
                         border-radius: 20px;
@@ -165,7 +177,6 @@ window.TMLib = (function () {
                         font-weight: 800;
                         text-transform: uppercase;
                         letter-spacing: 0.5px;
-                        display: inline-block;
                     `;
                     contactWrapper.appendChild(pill);
                 });
@@ -186,17 +197,12 @@ window.TMLib = (function () {
             font-size: 14px;
             cursor: pointer;
             border-radius: 4px;
-            transition: background 0.2s;
         `;
-        closeBtn.onmouseover = () => closeBtn.style.background = 'rgba(255, 0, 0, 0.6)';
-        closeBtn.onmouseout = () => closeBtn.style.background = 'rgba(255,255,255,0.2)';
         closeBtn.onclick = () => div.remove();
-        
         div.appendChild(closeBtn);
     
-        // 6. Injection
         document.body.appendChild(div);
-    }    
+    }
     
     // ===== CONFIG =====
     const CLIENT_ID = "329205197327-vvbujn7nh03m1b42r8ov4et9nckg8f7k.apps.googleusercontent.com";
@@ -288,7 +294,7 @@ window.TMLib = (function () {
             await new Promise(r => setTimeout(r, 300));
     
             // STEP 2: Search using the suffix
-            const searchUrl = `https://people.googleapis.com/v1/people:searchContacts?query=${lastFour}&readMask=names,phoneNumbers,memberships`;
+            const searchUrl = `https://people.googleapis.com/v1/people:searchContacts?query=${lastFour}&readMask=names,phoneNumbers,memberships,resourceName`;
     
             const response = await fetch(searchUrl, { headers });
             const data = await response.json();
@@ -314,7 +320,8 @@ window.TMLib = (function () {
                         return {
                             name: r.person.names?.[0]?.displayName || 'Unknown',
                             phones: r.person.phoneNumbers?.map(p => p.value) || [],
-                            labels: labels // These are the IDs like "myContacts" or "1234abcd"
+                            labels: labels, // These are the IDs like "myContacts" or "1234abcd"
+                            contactId: r.person.resourceName.split('/')[1] // Extract the ID part (c1234567) from "people/c1234567"
                         };
                     });
     
