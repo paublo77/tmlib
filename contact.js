@@ -67,7 +67,7 @@ window.TMLib = (function () {
     
     // ===== CONFIG =====
     const CLIENT_ID = "329205197327-vvbujn7nh03m1b42r8ov4et9nckg8f7k.apps.googleusercontent.com";
-    const REDIRECT_URI = "https://paublo77.github.io/tmlib/redirect.html";
+    const REDIRECT_URI = "http://localhost:8080/redirect.html";
     const SCOPES = "https://www.googleapis.com/auth/contacts.readonly";
 
     const TOKEN_KEY = "google_contacts_access_token";
