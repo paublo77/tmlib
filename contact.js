@@ -144,11 +144,13 @@ window.TMLib = (function () {
             const response = await fetch(searchUrl, { headers });
             const data = await response.json();
     
-            if (data.results && data.results.length > 0) {
+            if (data && data.results && data.results.length > 0) {
                 return data.results.map(r => ({
                     name: r.person.names?.[0]?.displayName || 'Unknown',
                     phones: r.person.phoneNumbers?.map(p => p.value) || []
                 }));
+            } else {
+                console.log("No matching contacts found.");
             }
             return [];
         } catch (err) {
